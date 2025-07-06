@@ -163,7 +163,7 @@ impl Toolbar {
         Self {
             active_item: None,
             items: Default::default(),
-            hidden: false,
+            hidden: true,
             can_navigate: true,
         }
     }
@@ -206,11 +206,7 @@ impl Toolbar {
         cx: &mut Context<Self>,
     ) {
         self.active_item = item.map(|item| item.boxed_clone());
-        self.hidden = self
-            .active_item
-            .as_ref()
-            .map(|item| !item.show_toolbar(cx))
-            .unwrap_or(false);
+        self.hidden = true;
 
         for (toolbar_item, current_location) in self.items.iter_mut() {
             let new_location = toolbar_item.set_active_pane_item(item, window, cx);

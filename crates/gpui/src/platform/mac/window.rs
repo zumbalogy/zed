@@ -366,8 +366,8 @@ struct MacWindowState {
     input_handler: Option<PlatformInputHandler>,
     last_key_equivalent: Option<KeyDownEvent>,
     synthetic_drag_counter: usize,
-    traffic_light_position: Option<Point<Pixels>>,
-    transparent_titlebar: bool,
+    // traffic_light_position: Option<Point<Pixels>>,
+    // transparent_titlebar: bool,
     previous_modifiers_changed_event: Option<PlatformInput>,
     keystroke_for_do_command: Option<Keystroke>,
     do_command_handled: Option<bool>,
@@ -379,54 +379,7 @@ struct MacWindowState {
 
 impl MacWindowState {
     fn move_traffic_light(&self) {
-        if let Some(traffic_light_position) = self.traffic_light_position {
-            if self.is_fullscreen() {
-                // Moving traffic lights while fullscreen doesn't work,
-                // see https://github.com/zed-industries/zed/issues/4712
-                return;
-            }
-
-            let titlebar_height = self.titlebar_height();
-
-            unsafe {
-                let close_button: id = msg_send![
-                    self.native_window,
-                    standardWindowButton: NSWindowButton::NSWindowCloseButton
-                ];
-                let min_button: id = msg_send![
-                    self.native_window,
-                    standardWindowButton: NSWindowButton::NSWindowMiniaturizeButton
-                ];
-                let zoom_button: id = msg_send![
-                    self.native_window,
-                    standardWindowButton: NSWindowButton::NSWindowZoomButton
-                ];
-
-                let mut close_button_frame: CGRect = msg_send![close_button, frame];
-                let mut min_button_frame: CGRect = msg_send![min_button, frame];
-                let mut zoom_button_frame: CGRect = msg_send![zoom_button, frame];
-                let mut origin = point(
-                    traffic_light_position.x,
-                    titlebar_height
-                        - traffic_light_position.y
-                        - px(close_button_frame.size.height as f32),
-                );
-                let button_spacing =
-                    px((min_button_frame.origin.x - close_button_frame.origin.x) as f32);
-
-                close_button_frame.origin = CGPoint::new(origin.x.into(), origin.y.into());
-                let _: () = msg_send![close_button, setFrame: close_button_frame];
-                origin.x += button_spacing;
-
-                min_button_frame.origin = CGPoint::new(origin.x.into(), origin.y.into());
-                let _: () = msg_send![min_button, setFrame: min_button_frame];
-                origin.x += button_spacing;
-
-                zoom_button_frame.origin = CGPoint::new(origin.x.into(), origin.y.into());
-                let _: () = msg_send![zoom_button, setFrame: zoom_button_frame];
-                origin.x += button_spacing;
-            }
-        }
+        return;
     }
 
     fn start_display_link(&mut self) {
@@ -543,20 +496,9 @@ impl MacWindow {
 
             let () = msg_send![class!(NSWindow), setAllowsAutomaticWindowTabbing: NO];
 
-            let mut style_mask;
-            if let Some(titlebar) = titlebar.as_ref() {
-                style_mask = NSWindowStyleMask::NSClosableWindowMask
-                    | NSWindowStyleMask::NSMiniaturizableWindowMask
-                    | NSWindowStyleMask::NSResizableWindowMask
-                    | NSWindowStyleMask::NSTitledWindowMask;
-
-                if titlebar.appears_transparent {
-                    style_mask |= NSWindowStyleMask::NSFullSizeContentViewWindowMask;
-                }
-            } else {
-                style_mask = NSWindowStyleMask::NSTitledWindowMask
-                    | NSWindowStyleMask::NSFullSizeContentViewWindowMask;
-            }
+            let mut style_mask = NSWindowStyleMask::NSResizableWindowMask |
+              NSWindowStyleMask::NSBorderlessWindowMask |
+              NSWindowStyleMask::NSFullSizeContentViewWindowMask;
 
             let native_window: id = match kind {
                 WindowKind::Normal => msg_send![WINDOW_CLASS, alloc],
@@ -648,12 +590,12 @@ impl MacWindow {
                 input_handler: None,
                 last_key_equivalent: None,
                 synthetic_drag_counter: 0,
-                traffic_light_position: titlebar
-                    .as_ref()
-                    .and_then(|titlebar| titlebar.traffic_light_position),
-                transparent_titlebar: titlebar
-                    .as_ref()
-                    .map_or(true, |titlebar| titlebar.appears_transparent),
+                // traffic_light_position: titlebar
+                //     .as_ref()
+                //     .and_then(|titlebar| titlebar.traffic_light_position),
+                // transparent_titlebar: titlebar
+                //     .as_ref()
+                //     .map_or(true, |titlebar| titlebar.appears_transparent),
                 previous_modifiers_changed_event: None,
                 keystroke_for_do_command: None,
                 do_command_handled: None,
@@ -672,12 +614,12 @@ impl MacWindow {
                 Arc::into_raw(window.0.clone()) as *const c_void,
             );
 
-            if let Some(title) = titlebar
-                .as_ref()
-                .and_then(|t| t.title.as_ref().map(AsRef::as_ref))
-            {
-                window.set_title(title);
-            }
+            // if let Some(title) = titlebar
+            //     .as_ref()
+            //     .and_then(|t| t.title.as_ref().map(AsRef::as_ref))
+            // {
+            //     window.set_title(title);
+            // }
 
             native_window.setMovable_(is_movable as BOOL);
 
@@ -688,10 +630,13 @@ impl MacWindow {
                 });
             }
 
-            if titlebar.map_or(true, |titlebar| titlebar.appears_transparent) {
-                native_window.setTitlebarAppearsTransparent_(YES);
-                native_window.setTitleVisibility_(NSWindowTitleVisibility::NSWindowTitleHidden);
-            }
+            native_window.setTitlebarAppearsTransparent_(YES);
+            native_window.setTitleVisibility_(NSWindowTitleVisibility::NSWindowTitleHidden);
+
+            // if titlebar.map_or(true, |titlebar| titlebar.appears_transparent) {
+            //     native_window.setTitlebarAppearsTransparent_(YES);
+            //     native_window.setTitleVisibility_(NSWindowTitleVisibility::NSWindowTitleHidden);
+            // }
 
             native_view.setAutoresizingMask_(NSViewWidthSizable | NSViewHeightSizable);
             native_view.setWantsBestResolutionOpenGLSurface_(YES);
@@ -1685,11 +1630,11 @@ extern "C" fn window_will_exit_fullscreen(this: &Object, _: Sel, _: id) {
 
     let min_version = NSOperatingSystemVersion::new(15, 3, 0);
 
-    if is_macos_version_at_least(min_version) && lock.transparent_titlebar {
-        unsafe {
-            lock.native_window.setTitlebarAppearsTransparent_(YES);
-        }
-    }
+    // if is_macos_version_at_least(min_version) && lock.transparent_titlebar {
+    //     unsafe {
+    //         lock.native_window.setTitlebarAppearsTransparent_(YES);
+    //     }
+    // }
 }
 
 pub(crate) fn is_macos_version_at_least(version: NSOperatingSystemVersion) -> bool {

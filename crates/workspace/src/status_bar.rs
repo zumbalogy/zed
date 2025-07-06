@@ -38,28 +38,28 @@ pub struct StatusBar {
 impl Render for StatusBar {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         h_flex()
-            .w_full()
-            .justify_between()
-            .gap(DynamicSpacing::Base08.rems(cx))
-            .py(DynamicSpacing::Base04.rems(cx))
-            .px(DynamicSpacing::Base08.rems(cx))
-            .bg(cx.theme().colors().status_bar_background)
-            .map(|el| match window.window_decorations() {
-                Decorations::Server => el,
-                Decorations::Client { tiling, .. } => el
-                    .when(!(tiling.bottom || tiling.right), |el| {
-                        el.rounded_br(CLIENT_SIDE_DECORATION_ROUNDING)
-                    })
-                    .when(!(tiling.bottom || tiling.left), |el| {
-                        el.rounded_bl(CLIENT_SIDE_DECORATION_ROUNDING)
-                    })
-                    // This border is to avoid a transparent gap in the rounded corners
-                    .mb(px(-1.))
-                    .border_b(px(1.0))
-                    .border_color(cx.theme().colors().status_bar_background),
-            })
-            .child(self.render_left_tools(cx))
-            .child(self.render_right_tools(cx))
+            // .w_full()
+            // .justify_between()
+            // .gap(DynamicSpacing::Base08.rems(cx))
+            // .py(DynamicSpacing::Base04.rems(cx))
+            // .px(DynamicSpacing::Base08.rems(cx))
+            // .bg(cx.theme().colors().status_bar_background)
+            // .map(|el| match window.window_decorations() {
+            //     Decorations::Server => el,
+            //     Decorations::Client { tiling, .. } => el
+            //         .when(!(tiling.bottom || tiling.right), |el| {
+            //             el.rounded_br(CLIENT_SIDE_DECORATION_ROUNDING)
+            //         })
+            //         .when(!(tiling.bottom || tiling.left), |el| {
+            //             el.rounded_bl(CLIENT_SIDE_DECORATION_ROUNDING)
+            //         })
+            //         // This border is to avoid a transparent gap in the rounded corners
+            //         .mb(px(-1.))
+            //         .border_b(px(1.0))
+            //         .border_color(cx.theme().colors().status_bar_background),
+            // })
+            // .child(self.render_left_tools(cx))
+            // .child(self.render_right_tools(cx))
     }
 }
 
