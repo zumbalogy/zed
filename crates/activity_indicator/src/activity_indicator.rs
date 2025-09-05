@@ -886,6 +886,9 @@ impl Render for ActivityIndicator {
 }
 
 impl StatusItemView for ActivityIndicator {
+    fn should_render(&self) -> bool {
+        return true;
+    }
     fn set_active_pane_item(
         &mut self,
         _: Option<&dyn ItemHandle>,

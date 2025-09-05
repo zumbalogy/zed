@@ -13,7 +13,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use settings::SettingsStore;
 use std::sync::Arc;
-use ui::{ContextMenu, Divider, DividerColor, IconButton, Tooltip, h_flex};
+use ui::{ContextMenu, Divider, DividerColor, IconButton, RightClickMenu, Tooltip, h_flex};
 use ui::{prelude::*, right_click_menu};
 
 pub(crate) const RESIZE_HANDLE_SIZE: Pixels = Pixels(6.);
@@ -839,21 +839,23 @@ impl PanelButtons {
             _settings_subscription: settings_subscription,
         }
     }
-}
 
-impl Render for PanelButtons {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    pub fn buttons(
+        &self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Vec<RightClickMenu<ContextMenu>> {
         let dock = self.dock.read(cx);
         let active_index = dock.active_panel_index;
-        let is_open = dock.is_open;
+
         let dock_position = dock.position;
 
         let (menu_anchor, menu_attach) = match dock.position {
             DockPosition::Left => (Corner::BottomLeft, Corner::TopLeft),
             DockPosition::Bottom | DockPosition::Right => (Corner::BottomRight, Corner::TopRight),
         };
-
-        let buttons: Vec<_> = dock
+        let is_open = dock.is_open;
+        return dock
             .panel_entries
             .iter()
             .enumerate()
@@ -933,23 +935,34 @@ impl Render for PanelButtons {
                 )
             })
             .collect();
+    }
+}
 
-        let has_buttons = !buttons.is_empty();
+impl Render for PanelButtons {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let buttons: Vec<_> = self.buttons(window, cx);
+        let dock = self.dock.read(cx);
 
         h_flex()
             .gap_1()
-            .when(
-                has_buttons && dock.position == DockPosition::Bottom,
-                |this| this.child(Divider::vertical().color(DividerColor::Border)),
-            )
             .children(buttons)
-            .when(has_buttons && dock.position == DockPosition::Left, |this| {
+            .when(dock.position == DockPosition::Bottom, |this| {
+                this.child(Divider::vertical().color(DividerColor::Border))
+            })
+            .when(dock.position == DockPosition::Left, |this| {
                 this.child(Divider::vertical().color(DividerColor::Border))
             })
     }
 }
 
 impl StatusItemView for PanelButtons {
+    fn should_render(&self) -> bool {
+        return true;
+        // Would need window and cx in scope?
+        // let buttons: Vec<_> = self.buttons(window, cx);
+        // return !buttons.is_empty();
+    }
+
     fn set_active_pane_item(
         &mut self,
         _active_pane_item: Option<&dyn crate::ItemHandle>,

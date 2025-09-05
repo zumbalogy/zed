@@ -236,6 +236,10 @@ impl Render for ActiveToolchain {
 }
 
 impl StatusItemView for ActiveToolchain {
+    fn should_render(&self) -> bool {
+        return true;
+    }
+
     fn set_active_pane_item(
         &mut self,
         active_pane_item: Option<&dyn ItemHandle>,

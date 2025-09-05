@@ -9,6 +9,7 @@ use ui::{h_flex, prelude::*};
 use util::ResultExt;
 
 pub trait StatusItemView: Render {
+    fn should_render(&self) -> bool;
     fn set_active_pane_item(
         &mut self,
         active_pane_item: Option<&dyn crate::ItemHandle>,
@@ -18,7 +19,7 @@ pub trait StatusItemView: Render {
 }
 
 trait StatusItemViewHandle: Send {
-    fn to_any(&self) -> AnyView;
+    fn to_any(&self) -> Option<AnyView>;
     fn set_active_pane_item(
         &self,
         active_pane_item: Option<&dyn ItemHandle>,
@@ -37,12 +38,20 @@ pub struct StatusBar {
 
 impl Render for StatusBar {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // would anything be cleaner if this called .collect?
+        let left_item_list = self.left_items.iter().filter_map(|x| x.to_any());
+        let right_item_list = self.right_items.iter().rev().filter_map(|x| x.to_any());
+
         h_flex()
             .w_full()
             .justify_between()
             .gap(DynamicSpacing::Base08.rems(cx))
-            .py(DynamicSpacing::Base04.rems(cx))
             .px(DynamicSpacing::Base06.rems(cx))
+            .when(
+                // Would like to avoid cloning
+                left_item_list.clone().count() > 0 || right_item_list.clone().count() > 0,
+                |this| this.py(DynamicSpacing::Base04.rems(cx)),
+            )
             .bg(cx.theme().colors().status_bar_background)
             .map(|el| match window.window_decorations() {
                 Decorations::Server => el,
@@ -58,24 +67,17 @@ impl Render for StatusBar {
                     .border_b(px(1.0))
                     .border_color(cx.theme().colors().status_bar_background),
             })
-            .child(self.render_left_tools())
-            .child(self.render_right_tools())
+            .child(self.render_children(left_item_list))
+            .child(self.render_children(right_item_list))
     }
 }
 
 impl StatusBar {
-    fn render_left_tools(&self) -> impl IntoElement {
-        h_flex()
-            .gap_1()
-            .overflow_x_hidden()
-            .children(self.left_items.iter().map(|item| item.to_any()))
-    }
-
-    fn render_right_tools(&self) -> impl IntoElement {
-        h_flex()
-            .gap_1()
-            .overflow_x_hidden()
-            .children(self.right_items.iter().rev().map(|item| item.to_any()))
+    fn render_children(
+        &self,
+        items: impl IntoIterator<Item = impl IntoElement>,
+    ) -> impl IntoElement {
+        h_flex().gap_1().overflow_x_hidden().children(items)
     }
 }
 
@@ -108,7 +110,7 @@ impl StatusBar {
         self.left_items
             .iter()
             .chain(self.right_items.iter())
-            .find_map(|item| item.to_any().downcast().log_err())
+            .find_map(|item| item.to_any()?.downcast().log_err())
     }
 
     pub fn position_of_item<T>(&self) -> Option<usize>
@@ -195,8 +197,13 @@ impl StatusBar {
 }
 
 impl<T: StatusItemView> StatusItemViewHandle for Entity<T> {
-    fn to_any(&self) -> AnyView {
-        self.clone().into()
+    fn to_any(&self) -> Option<AnyView> {
+        // if self.should_render() {
+        if true {
+            Some(self.clone().into())
+        } else {
+            None
+        }
     }
 
     fn set_active_pane_item(
@@ -215,8 +222,8 @@ impl<T: StatusItemView> StatusItemViewHandle for Entity<T> {
     }
 }
 
-impl From<&dyn StatusItemViewHandle> for AnyView {
-    fn from(val: &dyn StatusItemViewHandle) -> Self {
+impl From<&dyn StatusItemViewHandle> for Option<AnyView> {
+    fn from(val: &dyn StatusItemViewHandle) -> Option<AnyView> {
         val.to_any()
     }
 }

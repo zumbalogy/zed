@@ -208,6 +208,9 @@ impl DiagnosticIndicator {
 impl EventEmitter<ToolbarItemEvent> for DiagnosticIndicator {}
 
 impl StatusItemView for DiagnosticIndicator {
+    fn should_render(&self) -> bool {
+        return true;
+    }
     fn set_active_pane_item(
         &mut self,
         active_pane_item: Option<&dyn ItemHandle>,

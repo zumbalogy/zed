@@ -40,6 +40,10 @@ impl Render for SearchButton {
 }
 
 impl StatusItemView for SearchButton {
+    fn should_render(&self) -> bool {
+        return true;
+    }
+
     fn set_active_pane_item(
         &mut self,
         _active_pane_item: Option<&dyn ItemHandle>,

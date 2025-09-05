@@ -840,6 +840,10 @@ impl EditPredictionButton {
 }
 
 impl StatusItemView for EditPredictionButton {
+    fn should_render(&self) -> bool {
+        return true;
+    }
+
     fn set_active_pane_item(
         &mut self,
         item: Option<&dyn ItemHandle>,
