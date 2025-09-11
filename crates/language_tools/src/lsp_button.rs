@@ -8,7 +8,7 @@ use std::{
 use client::proto;
 use collections::HashSet;
 use editor::{Editor, EditorEvent};
-use gpui::{Corner, Entity, Subscription, Task, WeakEntity, actions};
+use gpui::{Corner, Empty, Entity, Subscription, Task, WeakEntity, actions};
 use language::{BinaryStatus, BufferId, ServerHealth};
 use lsp::{LanguageServerId, LanguageServerName, LanguageServerSelector};
 use project::{
@@ -1006,7 +1006,7 @@ impl StatusItemView for LspButton {
 impl Render for LspButton {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl ui::IntoElement {
         if self.server_state.read(cx).language_servers.is_empty() || self.lsp_menu.is_none() {
-            return div();
+            return Empty.into_any_element();
         }
 
         let mut has_errors = false;
@@ -1050,26 +1050,30 @@ impl Render for LspButton {
 
         let lsp_button = cx.entity();
 
-        div().child(
-            PopoverMenu::new("lsp-tool")
-                .menu(move |_, cx| lsp_button.read(cx).lsp_menu.clone())
-                .anchor(Corner::BottomLeft)
-                .with_handle(self.popover_menu_handle.clone())
-                .trigger_with_tooltip(
-                    IconButton::new("zed-lsp-tool-button", IconName::BoltOutlined)
-                        .when_some(indicator, IconButton::indicator)
-                        .icon_size(IconSize::Small)
-                        .indicator_border_color(Some(cx.theme().colors().status_bar_background)),
-                    move |window, cx| {
-                        Tooltip::with_meta(
-                            "Language Servers",
-                            Some(&ToggleMenu),
-                            description,
-                            window,
-                            cx,
-                        )
-                    },
-                ),
-        )
+        div()
+            .child(
+                PopoverMenu::new("lsp-tool")
+                    .menu(move |_, cx| lsp_button.read(cx).lsp_menu.clone())
+                    .anchor(Corner::BottomLeft)
+                    .with_handle(self.popover_menu_handle.clone())
+                    .trigger_with_tooltip(
+                        IconButton::new("zed-lsp-tool-button", IconName::BoltOutlined)
+                            .when_some(indicator, IconButton::indicator)
+                            .icon_size(IconSize::Small)
+                            .indicator_border_color(Some(
+                                cx.theme().colors().status_bar_background,
+                            )),
+                        move |window, cx| {
+                            Tooltip::with_meta(
+                                "Language Servers",
+                                Some(&ToggleMenu),
+                                description,
+                                window,
+                                cx,
+                            )
+                        },
+                    ),
+            )
+            .into_any_element()
     }
 }

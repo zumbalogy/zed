@@ -1,4 +1,4 @@
-use gpui::{Context, Entity, IntoElement, ParentElement, Render, Subscription, div};
+use gpui::{Context, Empty, Entity, IntoElement, ParentElement, Render, Subscription, div};
 use project::image_store::{ImageFormat, ImageMetadata};
 use settings::Settings;
 use ui::prelude::*;
@@ -47,7 +47,7 @@ impl Render for ImageInfo {
         let settings = ImageViewerSettings::get_global(cx);
 
         let Some(metadata) = self.metadata.as_ref() else {
-            return div();
+            return Empty.into_any_element();
         };
 
         let mut components = Vec::new();
@@ -77,9 +77,11 @@ impl Render for ImageInfo {
             .to_string(),
         );
 
-        div().child(
-            Button::new("image-metadata", components.join(" • ")).label_size(LabelSize::Small),
-        )
+        div()
+            .child(
+                Button::new("image-metadata", components.join(" • ")).label_size(LabelSize::Small),
+            )
+            .into_any_element()
     }
 }
 

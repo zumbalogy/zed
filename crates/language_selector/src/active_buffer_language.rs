@@ -1,6 +1,7 @@
 use editor::{Editor, EditorSettings};
 use gpui::{
-    Context, Entity, IntoElement, ParentElement, Render, Subscription, WeakEntity, Window, div,
+    Context, Empty, Entity, IntoElement, ParentElement, Render, Subscription, WeakEntity, Window,
+    div,
 };
 use language::LanguageName;
 use settings::Settings as _;
@@ -44,31 +45,33 @@ impl Render for ActiveBufferLanguage {
             .status_bar
             .active_language_button
         {
-            return div();
+            return Empty.into_any_element();
         }
 
-        div().when_some(self.active_language.as_ref(), |el, active_language| {
-            let active_language_text = if let Some(active_language_text) = active_language {
-                active_language_text.to_string()
-            } else {
-                "Unknown".to_string()
-            };
+        div()
+            .when_some(self.active_language.as_ref(), |el, active_language| {
+                let active_language_text = if let Some(active_language_text) = active_language {
+                    active_language_text.to_string()
+                } else {
+                    "Unknown".to_string()
+                };
 
-            el.child(
-                Button::new("change-language", active_language_text)
-                    .label_size(LabelSize::Small)
-                    .on_click(cx.listener(|this, _, window, cx| {
-                        if let Some(workspace) = this.workspace.upgrade() {
-                            workspace.update(cx, |workspace, cx| {
-                                LanguageSelector::toggle(workspace, window, cx)
-                            });
-                        }
-                    }))
-                    .tooltip(|window, cx| {
-                        Tooltip::for_action("Select Language", &Toggle, window, cx)
-                    }),
-            )
-        })
+                el.child(
+                    Button::new("change-language", active_language_text)
+                        .label_size(LabelSize::Small)
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            if let Some(workspace) = this.workspace.upgrade() {
+                                workspace.update(cx, |workspace, cx| {
+                                    LanguageSelector::toggle(workspace, window, cx)
+                                });
+                            }
+                        }))
+                        .tooltip(|window, cx| {
+                            Tooltip::for_action("Select Language", &Toggle, window, cx)
+                        }),
+                )
+            })
+            .into_any_element()
     }
 }
 

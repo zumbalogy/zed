@@ -3,8 +3,8 @@ use editor::Editor;
 use extension_host::{ExtensionOperation, ExtensionStore};
 use futures::StreamExt;
 use gpui::{
-    App, Context, CursorStyle, Entity, EventEmitter, InteractiveElement as _, ParentElement as _,
-    Render, SharedString, StatefulInteractiveElement, Styled, Window, actions,
+    App, Context, CursorStyle, Empty, Entity, EventEmitter, InteractiveElement as _,
+    ParentElement as _, Render, SharedString, StatefulInteractiveElement, Styled, Window, actions,
 };
 use language::{
     BinaryStatus, LanguageRegistry, LanguageServerId, LanguageServerName,
@@ -774,110 +774,115 @@ const MAX_MESSAGE_LEN: usize = 50;
 
 impl Render for ActivityIndicator {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let result = h_flex()
-            .id("activity-indicator")
-            .on_action(cx.listener(Self::show_error_message))
-            .on_action(cx.listener(Self::dismiss_error_message));
         let Some(content) = self.content_to_render(cx) else {
-            return result;
+            // Will this not having listeners be a problem?
+            return Empty.into_any_element();
         };
         let this = cx.entity().downgrade();
         let truncate_content = content.message.len() > MAX_MESSAGE_LEN;
-        result.gap_2().child(
-            PopoverMenu::new("activity-indicator-popover")
-                .trigger(
-                    ButtonLike::new("activity-indicator-trigger").child(
-                        h_flex()
-                            .id("activity-indicator-status")
-                            .gap_2()
-                            .children(content.icon)
-                            .map(|button| {
-                                if truncate_content {
-                                    button
-                                        .child(
-                                            Label::new(truncate_and_trailoff(
-                                                &content.message,
-                                                MAX_MESSAGE_LEN,
-                                            ))
-                                            .size(LabelSize::Small),
-                                        )
-                                        .tooltip(Tooltip::text(content.message))
+        h_flex()
+            .gap_2()
+            .id("activity-indicator")
+            .on_action(cx.listener(Self::show_error_message))
+            .on_action(cx.listener(Self::dismiss_error_message))
+            .child(
+                PopoverMenu::new("activity-indicator-popover")
+                    .trigger(
+                        ButtonLike::new("activity-indicator-trigger").child(
+                            h_flex()
+                                .id("activity-indicator-status")
+                                .gap_2()
+                                .children(content.icon)
+                                .map(|button| {
+                                    if truncate_content {
+                                        button
+                                            .child(
+                                                Label::new(truncate_and_trailoff(
+                                                    &content.message,
+                                                    MAX_MESSAGE_LEN,
+                                                ))
+                                                .size(LabelSize::Small),
+                                            )
+                                            .tooltip(Tooltip::text(content.message))
+                                    } else {
+                                        button
+                                            .child(
+                                                Label::new(content.message).size(LabelSize::Small),
+                                            )
+                                            .when_some(
+                                                content.tooltip_message,
+                                                |this, tooltip_message| {
+                                                    this.tooltip(Tooltip::text(tooltip_message))
+                                                },
+                                            )
+                                    }
+                                })
+                                .when_some(content.on_click, |this, handler| {
+                                    this.on_click(cx.listener(move |this, _, window, cx| {
+                                        handler(this, window, cx);
+                                    }))
+                                    .cursor(CursorStyle::PointingHand)
+                                }),
+                        ),
+                    )
+                    .anchor(gpui::Corner::BottomLeft)
+                    .menu(move |window, cx| {
+                        let strong_this = this.upgrade()?;
+                        let mut has_work = false;
+                        let menu = ContextMenu::build(window, cx, |mut menu, _, cx| {
+                            for work in strong_this.read(cx).pending_language_server_work(cx) {
+                                has_work = true;
+                                let this = this.clone();
+                                let mut title = work
+                                    .progress
+                                    .title
+                                    .as_deref()
+                                    .unwrap_or(work.progress_token)
+                                    .to_owned();
+
+                                if work.progress.is_cancellable {
+                                    let language_server_id = work.language_server_id;
+                                    let token = work.progress_token.to_string();
+                                    let title = SharedString::from(title);
+                                    menu = menu.custom_entry(
+                                        move |_, _| {
+                                            h_flex()
+                                                .w_full()
+                                                .justify_between()
+                                                .child(Label::new(title.clone()))
+                                                .child(Icon::new(IconName::XCircle))
+                                                .into_any_element()
+                                        },
+                                        move |_, cx| {
+                                            this.update(cx, |this, cx| {
+                                                this.project.update(cx, |project, cx| {
+                                                    project.cancel_language_server_work(
+                                                        language_server_id,
+                                                        Some(token.clone()),
+                                                        cx,
+                                                    );
+                                                });
+                                                this.context_menu_handle.hide(cx);
+                                                cx.notify();
+                                            })
+                                            .ok();
+                                        },
+                                    );
                                 } else {
-                                    button
-                                        .child(Label::new(content.message).size(LabelSize::Small))
-                                        .when_some(
-                                            content.tooltip_message,
-                                            |this, tooltip_message| {
-                                                this.tooltip(Tooltip::text(tooltip_message))
-                                            },
-                                        )
-                                }
-                            })
-                            .when_some(content.on_click, |this, handler| {
-                                this.on_click(cx.listener(move |this, _, window, cx| {
-                                    handler(this, window, cx);
-                                }))
-                                .cursor(CursorStyle::PointingHand)
-                            }),
-                    ),
-                )
-                .anchor(gpui::Corner::BottomLeft)
-                .menu(move |window, cx| {
-                    let strong_this = this.upgrade()?;
-                    let mut has_work = false;
-                    let menu = ContextMenu::build(window, cx, |mut menu, _, cx| {
-                        for work in strong_this.read(cx).pending_language_server_work(cx) {
-                            has_work = true;
-                            let this = this.clone();
-                            let mut title = work
-                                .progress
-                                .title
-                                .as_deref()
-                                .unwrap_or(work.progress_token)
-                                .to_owned();
+                                    if let Some(progress_message) = work.progress.message.as_ref() {
+                                        title.push_str(": ");
+                                        title.push_str(progress_message);
+                                    }
 
-                            if work.progress.is_cancellable {
-                                let language_server_id = work.language_server_id;
-                                let token = work.progress_token.to_string();
-                                let title = SharedString::from(title);
-                                menu = menu.custom_entry(
-                                    move |_, _| {
-                                        h_flex()
-                                            .w_full()
-                                            .justify_between()
-                                            .child(Label::new(title.clone()))
-                                            .child(Icon::new(IconName::XCircle))
-                                            .into_any_element()
-                                    },
-                                    move |_, cx| {
-                                        this.update(cx, |this, cx| {
-                                            this.project.update(cx, |project, cx| {
-                                                project.cancel_language_server_work(
-                                                    language_server_id,
-                                                    Some(token.clone()),
-                                                    cx,
-                                                );
-                                            });
-                                            this.context_menu_handle.hide(cx);
-                                            cx.notify();
-                                        })
-                                        .ok();
-                                    },
-                                );
-                            } else {
-                                if let Some(progress_message) = work.progress.message.as_ref() {
-                                    title.push_str(": ");
-                                    title.push_str(progress_message);
+                                    menu = menu.label(title);
                                 }
-
-                                menu = menu.label(title);
                             }
-                        }
-                        menu
-                    });
-                    has_work.then_some(menu)
-                }),
-        )
+                            menu
+                        });
+                        has_work.then_some(menu)
+                    }),
+            )
+            .into_any_element()
     }
 }
 

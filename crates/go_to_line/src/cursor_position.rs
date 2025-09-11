@@ -1,5 +1,5 @@
 use editor::{Editor, EditorSettings, MultiBufferSnapshot};
-use gpui::{App, Entity, FocusHandle, Focusable, Subscription, Task, WeakEntity};
+use gpui::{App, Empty, Entity, FocusHandle, Focusable, Subscription, Task, WeakEntity};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use settings::{Settings, SettingsKey, SettingsSources, SettingsUi};
@@ -211,53 +211,56 @@ impl Render for CursorPosition {
             .status_bar
             .cursor_position_button
         {
-            return div();
+            return Empty.into_any_element();
         }
 
-        div().when_some(self.position, |el, position| {
-            let mut text = format!(
-                "{}{FILE_ROW_COLUMN_DELIMITER}{}",
-                position.line, position.character,
-            );
-            self.write_position(&mut text, cx);
+        div()
+            .when_some(self.position, |el, position| {
+                let mut text = format!(
+                    "{}{FILE_ROW_COLUMN_DELIMITER}{}",
+                    position.line, position.character,
+                );
+                self.write_position(&mut text, cx);
 
-            let context = self.context.clone();
+                let context = self.context.clone();
 
-            el.child(
-                Button::new("go-to-line-column", text)
-                    .label_size(LabelSize::Small)
-                    .on_click(cx.listener(|this, _, window, cx| {
-                        if let Some(workspace) = this.workspace.upgrade() {
-                            workspace.update(cx, |workspace, cx| {
-                                if let Some(editor) = workspace
-                                    .active_item(cx)
-                                    .and_then(|item| item.act_as::<Editor>(cx))
-                                    && let Some((_, buffer, _)) = editor.read(cx).active_excerpt(cx)
-                                {
-                                    workspace.toggle_modal(window, cx, |window, cx| {
-                                        crate::GoToLine::new(editor, buffer, window, cx)
-                                    })
-                                }
-                            });
-                        }
-                    }))
-                    .tooltip(move |window, cx| match context.as_ref() {
-                        Some(context) => Tooltip::for_action_in(
-                            "Go to Line/Column",
-                            &editor::actions::ToggleGoToLine,
-                            context,
-                            window,
-                            cx,
-                        ),
-                        None => Tooltip::for_action(
-                            "Go to Line/Column",
-                            &editor::actions::ToggleGoToLine,
-                            window,
-                            cx,
-                        ),
-                    }),
-            )
-        })
+                el.child(
+                    Button::new("go-to-line-column", text)
+                        .label_size(LabelSize::Small)
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            if let Some(workspace) = this.workspace.upgrade() {
+                                workspace.update(cx, |workspace, cx| {
+                                    if let Some(editor) = workspace
+                                        .active_item(cx)
+                                        .and_then(|item| item.act_as::<Editor>(cx))
+                                        && let Some((_, buffer, _)) =
+                                            editor.read(cx).active_excerpt(cx)
+                                    {
+                                        workspace.toggle_modal(window, cx, |window, cx| {
+                                            crate::GoToLine::new(editor, buffer, window, cx)
+                                        })
+                                    }
+                                });
+                            }
+                        }))
+                        .tooltip(move |window, cx| match context.as_ref() {
+                            Some(context) => Tooltip::for_action_in(
+                                "Go to Line/Column",
+                                &editor::actions::ToggleGoToLine,
+                                context,
+                                window,
+                                cx,
+                            ),
+                            None => Tooltip::for_action(
+                                "Go to Line/Column",
+                                &editor::actions::ToggleGoToLine,
+                                window,
+                                cx,
+                            ),
+                        }),
+                )
+            })
+            .into_any_element()
     }
 }
 

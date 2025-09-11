@@ -4,10 +4,10 @@ use crate::{Workspace, status_bar::StatusItemView};
 use anyhow::Context as _;
 use client::proto;
 use gpui::{
-    Action, AnyView, App, Axis, Context, Corner, Entity, EntityId, EventEmitter, FocusHandle,
-    Focusable, IntoElement, KeyContext, MouseButton, MouseDownEvent, MouseUpEvent, ParentElement,
-    Render, SharedString, StyleRefinement, Styled, Subscription, WeakEntity, Window, deferred, div,
-    px,
+    Action, AnyView, App, Axis, Context, Corner, Empty, Entity, EntityId, EventEmitter,
+    FocusHandle, Focusable, IntoElement, KeyContext, MouseButton, MouseDownEvent, MouseUpEvent,
+    ParentElement, Render, SharedString, StyleRefinement, Styled, Subscription, WeakEntity, Window,
+    deferred, div, px,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -934,18 +934,20 @@ impl Render for PanelButtons {
             })
             .collect();
 
-        let has_buttons = !buttons.is_empty();
+        if buttons.is_empty() {
+            return Empty.into_any_element();
+        }
 
         h_flex()
             .gap_1()
-            .when(
-                has_buttons && dock.position == DockPosition::Bottom,
-                |this| this.child(Divider::vertical().color(DividerColor::Border)),
-            )
-            .children(buttons)
-            .when(has_buttons && dock.position == DockPosition::Left, |this| {
+            .when(dock.position == DockPosition::Bottom, |this| {
                 this.child(Divider::vertical().color(DividerColor::Border))
             })
+            .children(buttons)
+            .when(dock.position == DockPosition::Left, |this| {
+                this.child(Divider::vertical().color(DividerColor::Border))
+            })
+            .into_any_element()
     }
 }
 

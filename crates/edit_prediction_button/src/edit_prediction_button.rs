@@ -6,7 +6,7 @@ use editor::{Editor, SelectionEffects, actions::ShowEditPrediction, scroll::Auto
 use feature_flags::{FeatureFlagAppExt, PredictEditsRateCompletionsFeatureFlag};
 use fs::Fs;
 use gpui::{
-    Action, Animation, AnimationExt, App, AsyncWindowContext, Corner, Entity, FocusHandle,
+    Action, Animation, AnimationExt, App, AsyncWindowContext, Corner, Empty, Entity, FocusHandle,
     Focusable, IntoElement, ParentElement, Render, Subscription, WeakEntity, actions, div,
     pulsating_between,
 };
@@ -69,19 +69,18 @@ enum SupermavenButtonStatus {
 
 impl Render for EditPredictionButton {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        // Return empty div if AI is disabled
         if DisableAiSettings::get_global(cx).disable_ai {
-            return div();
+            return Empty.into_any_element();
         }
 
         let all_language_settings = all_language_settings(None, cx);
 
         match all_language_settings.edit_predictions.provider {
-            EditPredictionProvider::None => div(),
+            EditPredictionProvider::None => Empty.into_any_element(),
 
             EditPredictionProvider::Copilot => {
                 let Some(copilot) = Copilot::global(cx) else {
-                    return div();
+                    return Empty.into_any_element();
                 };
                 let status = copilot.read(cx).status();
 
@@ -100,61 +99,62 @@ impl Render for EditPredictionButton {
                 };
 
                 if let Status::Error(e) = status {
-                    return div().child(
-                        IconButton::new("copilot-error", icon)
-                            .icon_size(IconSize::Small)
-                            .on_click(cx.listener(move |_, _, window, cx| {
-                                if let Some(workspace) = window.root::<Workspace>().flatten() {
-                                    workspace.update(cx, |workspace, cx| {
-                                        workspace.show_toast(
-                                            Toast::new(
-                                                NotificationId::unique::<CopilotErrorToast>(),
-                                                format!("Copilot can't be started: {}", e),
-                                            )
-                                            .on_click(
-                                                "Reinstall Copilot",
-                                                |window, cx| {
+                    return div()
+                        .child(
+                            IconButton::new("copilot-error", icon)
+                                .icon_size(IconSize::Small)
+                                .on_click(cx.listener(move |_, _, window, cx| {
+                                    if let Some(workspace) = window.root::<Workspace>().flatten() {
+                                        workspace.update(cx, |workspace, cx| {
+                                            workspace.show_toast(
+                                                Toast::new(
+                                                    NotificationId::unique::<CopilotErrorToast>(),
+                                                    format!("Copilot can't be started: {}", e),
+                                                )
+                                                .on_click("Reinstall Copilot", |window, cx| {
                                                     copilot::reinstall_and_sign_in(window, cx)
-                                                },
-                                            ),
-                                            cx,
-                                        );
-                                    });
-                                }
-                            }))
-                            .tooltip(|window, cx| {
-                                Tooltip::for_action("GitHub Copilot", &ToggleMenu, window, cx)
-                            }),
-                    );
+                                                }),
+                                                cx,
+                                            );
+                                        });
+                                    }
+                                }))
+                                .tooltip(|window, cx| {
+                                    Tooltip::for_action("GitHub Copilot", &ToggleMenu, window, cx)
+                                }),
+                        )
+                        .into_any_element();
                 }
                 let this = cx.entity();
 
-                div().child(
-                    PopoverMenu::new("copilot")
-                        .menu(move |window, cx| {
-                            Some(match status {
-                                Status::Authorized => this.update(cx, |this, cx| {
-                                    this.build_copilot_context_menu(window, cx)
-                                }),
-                                _ => this.update(cx, |this, cx| {
-                                    this.build_copilot_start_menu(window, cx)
-                                }),
+                div()
+                    .child(
+                        PopoverMenu::new("copilot")
+                            .menu(move |window, cx| {
+                                Some(match status {
+                                    Status::Authorized => this.update(cx, |this, cx| {
+                                        this.build_copilot_context_menu(window, cx)
+                                    }),
+                                    _ => this.update(cx, |this, cx| {
+                                        this.build_copilot_start_menu(window, cx)
+                                    }),
+                                })
                             })
-                        })
-                        .anchor(Corner::BottomRight)
-                        .trigger_with_tooltip(
-                            IconButton::new("copilot-icon", icon),
-                            |window, cx| {
-                                Tooltip::for_action("GitHub Copilot", &ToggleMenu, window, cx)
-                            },
-                        )
-                        .with_handle(self.popover_menu_handle.clone()),
-                )
+                            .anchor(Corner::BottomRight)
+                            .trigger_with_tooltip(
+                                IconButton::new("copilot-icon", icon),
+                                |window, cx| {
+                                    Tooltip::for_action("GitHub Copilot", &ToggleMenu, window, cx)
+                                },
+                            )
+                            .with_handle(self.popover_menu_handle.clone()),
+                    )
+                    .into_any_element()
             }
 
             EditPredictionProvider::Supermaven => {
                 let Some(supermaven) = Supermaven::global(cx) else {
-                    return div();
+                    return Empty.into_any_element();
                 };
 
                 let supermaven = supermaven.read(cx);
@@ -185,52 +185,56 @@ impl Render for EditPredictionButton {
                 let this = cx.entity();
                 let fs = self.fs.clone();
 
-                div().child(
-                    PopoverMenu::new("supermaven")
-                        .menu(move |window, cx| match &status {
-                            SupermavenButtonStatus::NeedsActivation(activate_url) => {
-                                Some(ContextMenu::build(window, cx, |menu, _, _| {
-                                    let fs = fs.clone();
-                                    let activate_url = activate_url.clone();
-                                    menu.entry("Sign In", None, move |_, cx| {
-                                        cx.open_url(activate_url.as_str())
-                                    })
-                                    .entry(
-                                        "Use Zed AI",
-                                        None,
-                                        move |_, cx| {
-                                            set_completion_provider(
-                                                fs.clone(),
-                                                cx,
-                                                EditPredictionProvider::Zed,
-                                            )
-                                        },
-                                    )
-                                }))
-                            }
-                            SupermavenButtonStatus::Ready => Some(this.update(cx, |this, cx| {
-                                this.build_supermaven_context_menu(window, cx)
-                            })),
-                            _ => None,
-                        })
-                        .anchor(Corner::BottomRight)
-                        .trigger_with_tooltip(
-                            IconButton::new("supermaven-icon", icon),
-                            move |window, cx| {
-                                if has_menu {
-                                    Tooltip::for_action(
-                                        tooltip_text.clone(),
-                                        &ToggleMenu,
-                                        window,
-                                        cx,
-                                    )
-                                } else {
-                                    Tooltip::text(tooltip_text.clone())(window, cx)
+                div()
+                    .child(
+                        PopoverMenu::new("supermaven")
+                            .menu(move |window, cx| match &status {
+                                SupermavenButtonStatus::NeedsActivation(activate_url) => {
+                                    Some(ContextMenu::build(window, cx, |menu, _, _| {
+                                        let fs = fs.clone();
+                                        let activate_url = activate_url.clone();
+                                        menu.entry("Sign In", None, move |_, cx| {
+                                            cx.open_url(activate_url.as_str())
+                                        })
+                                        .entry(
+                                            "Use Zed AI",
+                                            None,
+                                            move |_, cx| {
+                                                set_completion_provider(
+                                                    fs.clone(),
+                                                    cx,
+                                                    EditPredictionProvider::Zed,
+                                                )
+                                            },
+                                        )
+                                    }))
                                 }
-                            },
-                        )
-                        .with_handle(self.popover_menu_handle.clone()),
-                )
+                                SupermavenButtonStatus::Ready => {
+                                    Some(this.update(cx, |this, cx| {
+                                        this.build_supermaven_context_menu(window, cx)
+                                    }))
+                                }
+                                _ => None,
+                            })
+                            .anchor(Corner::BottomRight)
+                            .trigger_with_tooltip(
+                                IconButton::new("supermaven-icon", icon),
+                                move |window, cx| {
+                                    if has_menu {
+                                        Tooltip::for_action(
+                                            tooltip_text.clone(),
+                                            &ToggleMenu,
+                                            window,
+                                            cx,
+                                        )
+                                    } else {
+                                        Tooltip::text(tooltip_text.clone())(window, cx)
+                                    }
+                                },
+                            )
+                            .with_handle(self.popover_menu_handle.clone()),
+                    )
+                    .into_any_element()
             }
 
             EditPredictionProvider::Zed => {
@@ -249,31 +253,35 @@ impl Render for EditPredictionButton {
                         "Sign In"
                     };
 
-                    return div().child(
-                        IconButton::new("zed-predict-pending-button", zeta_icon)
-                            .shape(IconButtonShape::Square)
-                            .indicator(Indicator::dot().color(Color::Muted))
-                            .indicator_border_color(Some(cx.theme().colors().status_bar_background))
-                            .tooltip(move |window, cx| {
-                                Tooltip::with_meta(
-                                    "Edit Predictions",
-                                    None,
-                                    tooltip_meta,
-                                    window,
-                                    cx,
-                                )
-                            })
-                            .on_click(cx.listener(move |_, _, window, cx| {
-                                telemetry::event!(
-                                    "Pending ToS Clicked",
-                                    source = "Edit Prediction Status Button"
-                                );
-                                window.dispatch_action(
-                                    zed_actions::OpenZedPredictOnboarding.boxed_clone(),
-                                    cx,
-                                );
-                            })),
-                    );
+                    return div()
+                        .child(
+                            IconButton::new("zed-predict-pending-button", zeta_icon)
+                                .shape(IconButtonShape::Square)
+                                .indicator(Indicator::dot().color(Color::Muted))
+                                .indicator_border_color(Some(
+                                    cx.theme().colors().status_bar_background,
+                                ))
+                                .tooltip(move |window, cx| {
+                                    Tooltip::with_meta(
+                                        "Edit Predictions",
+                                        None,
+                                        tooltip_meta,
+                                        window,
+                                        cx,
+                                    )
+                                })
+                                .on_click(cx.listener(move |_, _, window, cx| {
+                                    telemetry::event!(
+                                        "Pending ToS Clicked",
+                                        source = "Edit Prediction Status Button"
+                                    );
+                                    window.dispatch_action(
+                                        zed_actions::OpenZedPredictOnboarding.boxed_clone(),
+                                        cx,
+                                    );
+                                })),
+                        )
+                        .into_any_element();
                 }
 
                 let mut over_limit = false;
@@ -355,7 +363,9 @@ impl Render for EditPredictionButton {
                     popover_menu = popover_menu.trigger(icon_button);
                 }
 
-                div().child(popover_menu.into_any_element())
+                div()
+                    .child(popover_menu.into_any_element())
+                    .into_any_element()
             }
         }
     }
